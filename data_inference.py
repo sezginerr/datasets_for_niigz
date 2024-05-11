@@ -47,12 +47,11 @@ class CTReportDatasetinfer(Dataset):
             accession_folders = glob.glob(os.path.join(patient_folder, '*'))
 
             for accession_folder in accession_folders:
-                nii_files = glob.glob(os.path.join(accession_folder, '*.npz'))
+                nii_files = glob.glob(os.path.join(accession_folder, '*.nii.gz'))
 
                 for nii_file in nii_files:
                     accession_number = nii_file.split("/")[-1]
 
-                    accession_number = accession_number.replace(".npz", ".nii.gz")
                     if accession_number not in self.accession_to_text:
                         continue
 
@@ -75,9 +74,38 @@ class CTReportDatasetinfer(Dataset):
         return len(self.samples)
 
     def nii_img_to_tensor(self, path, transform):
-        img_data = np.load(path)['arr_0']
+        nii_img = nib.load(str(path))
+        img_data = nii_img.get_fdata()
+        
+        df = pd.read_csv("validation_metadata.csv") #select the metadata
+        file_name = path.split("/")[-1]
+        row = df[df['VolumeName'] == file_name]
+        slope = float(row["RescaleSlope"].iloc[0])
+        intercept = float(row["RescaleIntercept"].iloc[0])
+        xy_spacing = float(row["XYSpacing"].iloc[0][1:][:-2].split(",")[0])
+        z_spacing = float(row["ZSpacing"].iloc[0])
+    
+        # Define the target spacing values
+        target_x_spacing = 0.75
+        target_y_spacing = 0.75
+        target_z_spacing = 1.5
+    
+        current = (z_spacing, xy_spacing, xy_spacing)
+        target = (target_z_spacing, target_x_spacing, target_y_spacing)
+    
+        img_data = slope * img_data + intercept
+        hu_min, hu_max = -1000, 1000
+        img_data = np.clip(img_data, hu_min, hu_max)
+    
+        img_data = img_data.transpose(2, 0, 1)
+        
+        tensor = torch.tensor(img_data)
+        tensor = tensor.unsqueeze(0).unsqueeze(0)
+        
+        img_data = resize_array(tensor, current, target)
+        img_data = img_data[0][0]
         img_data= np.transpose(img_data, (1, 2, 0))
-        img_data = img_data*1000
+        
         hu_min, hu_max = -1000, 1000
         img_data = np.clip(img_data, hu_min, hu_max)
 
@@ -87,6 +115,7 @@ class CTReportDatasetinfer(Dataset):
         tensor = torch.tensor(img_data)
         # Get the dimensions of the input tensor
         target_shape = (480,480,240)
+        
         # Extract dimensions
         h, w, d = tensor.shape
 
@@ -113,12 +142,12 @@ class CTReportDatasetinfer(Dataset):
 
         tensor = torch.nn.functional.pad(tensor, (pad_d_before, pad_d_after, pad_w_before, pad_w_after, pad_h_before, pad_h_after), value=-1)
 
-
         tensor = tensor.permute(2, 0, 1)
-
+        
         tensor = tensor.unsqueeze(0)
 
         return tensor
+
 
     def __getitem__(self, index):
         nii_file, input_text, onehotlabels = self.samples[index]
