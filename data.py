@@ -117,7 +117,7 @@ class CTReportDataset(Dataset):
         target = (target_z_spacing, target_x_spacing, target_y_spacing)
     
         img_data = slope * img_data + intercept
-        hu_min, hu_max = -1000, 1000
+        hu_min, hu_max = -1000, 200
         img_data = np.clip(img_data, hu_min, hu_max)
     
         img_data = img_data.transpose(2, 0, 1)
@@ -128,9 +128,6 @@ class CTReportDataset(Dataset):
         img_data = resize_array(tensor, current, target)
         img_data = img_data[0][0]
         img_data= np.transpose(img_data, (1, 2, 0))
-        
-        hu_min, hu_max = -1000, 1000
-        img_data = np.clip(img_data, hu_min, hu_max)
 
         img_data = (((img_data+400 ) / 600)).astype(np.float32)
         slices=[]
