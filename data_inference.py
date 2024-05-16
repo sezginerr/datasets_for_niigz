@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 from functools import partial
 import torch.nn.functional as F
 import tqdm
-
+import nibabel as nib
 
 class CTReportDatasetinfer(Dataset):
     def __init__(self, data_folder, csv_file, min_slices=20, resize_dim=500, force_num_frames=True, labels = "labels.csv"):
