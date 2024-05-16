@@ -12,6 +12,32 @@ import torch.nn.functional as F
 import tqdm
 import nibabel as nib
 
+def resize_array(array, current_spacing, target_spacing):
+    """
+    Resize the array to match the target spacing.
+
+    Args:
+    array (torch.Tensor): Input array to be resized.
+    current_spacing (tuple): Current voxel spacing (z_spacing, xy_spacing, xy_spacing).
+    target_spacing (tuple): Target voxel spacing (target_z_spacing, target_x_spacing, target_y_spacing).
+
+    Returns:
+    np.ndarray: Resized array.
+    """
+    # Calculate new dimensions
+    original_shape = array.shape[2:]
+    scaling_factors = [
+        current_spacing[i] / target_spacing[i] for i in range(len(original_shape))
+    ]
+    new_shape = [
+        int(original_shape[i] * scaling_factors[i]) for i in range(len(original_shape))
+    ]
+    # Resize the array
+    resized_array = F.interpolate(array, size=new_shape, mode='trilinear', align_corners=False).cpu().numpy()
+    return resized_array
+
+
+
 class CTReportDatasetinfer(Dataset):
     def __init__(self, data_folder, csv_file, min_slices=20, resize_dim=500, force_num_frames=True, labels = "labels.csv"):
         self.data_folder = data_folder
